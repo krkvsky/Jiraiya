@@ -1,9 +1,20 @@
 import java.net.URI
 
+import akka.actor.{ActorSystem, Props}
 import com.atlassian.jira.rest.client.internal.async._
 
 object Main extends App{
-  JirayaBot.run()
+
+//  JirayaBot.run()
+
+  Data.db.run(Data.setup)
+
+//  val system = ActorSystem("PingPongSystem")
+//  val pong = system.actorOf(Props[Pong], name = "pong")
+//  val ping = system.actorOf(Props(new Ping(pong)), name = "ping")
+//
+//  ping ! StartMessage
+
 //  val URI =  new URI("http://jira.tallium.com:8085")
 
 //  val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
