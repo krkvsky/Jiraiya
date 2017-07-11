@@ -1,13 +1,46 @@
 import java.net.URI
 
+import Data._
 import akka.actor.{ActorSystem, Props}
 import com.atlassian.jira.rest.client.internal.async._
+import com.atlassian.jira.rest.client.api.IssueRestClient
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import slick.driver.SQLiteDriver.api._
+
+import scala.concurrent.Await
+import scala.util.{Failure, Success}
 
 object Main extends App{
+  JirayaBot.run()
 
-//  JirayaBot.run()
+//  Await.result(db.run(setup), Duration.Inf)
 
-  Data.db.run(Data.setup)
+  //  Await.result(db.run(
+//    DBIO.seq(
+//      users += UserDB(None, 1, "my"),
+//      projects += ProjectDB(None, "Geeksy.ml", "GEEKS"),
+//      issues ++= Seq(
+//        IssueDB(None, "GEEKS-992", "Let's do it", "alo", 1L),
+//        IssueDB(None, "GEEKS-993", "Let's do it2", "alo", 1L)
+//      ),
+//      userissues += UserIssueDB(8, 1)
+//    )
+//  ), Duration.Inf)
+//  val q1 = users.map(x => x)
+//  val action = q1.result
+//  val result = db.run(action)
+
+//  println(Await.result(result, Duration.Inf))
+
+//  println(result)
+
+//  if (result.isCompleted) {
+//    result.foreach(x => println(x))
+//    val last = result.result(10 seconds)
+//    println(last)
+//  }
 
 //  val system = ActorSystem("PingPongSystem")
 //  val pong = system.actorOf(Props[Pong], name = "pong")
@@ -27,7 +60,9 @@ object Main extends App{
 //    case e: Exception => println("login failed")
 //  }
 //  new AsynchronousJiraRestClientFactory
-//  println(restClient)
+//  val issue = restClient.getSearchClient().searchJql("key=desn-4918").claim().getIssues.iterator().next()
+//  val iss = IssueDB(None, issue.getKey, issue.getSummary, issue.getDescription, 1L)
+//  println(iss)
 //  val restAuthClient = new AsynchronousJiraRestClientFactory().
 //  val me = restClient.getUserClient().getUser("yaroslavk")
 //  val projectGEEKS = restClient.getSearchClient().searchJql("project=GEEKS AND assignee=yaroslavk AND status = done")

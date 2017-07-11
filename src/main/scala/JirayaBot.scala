@@ -6,11 +6,25 @@ import info.mukel.telegrambot4s.api.declarative._
 import info.mukel.telegrambot4s.methods.{ParseMode, SendMessage}
 import info.mukel.telegrambot4s.models.Message
 import info.mukel.telegrambot4s.Implicits._
+import slick.driver.SQLiteDriver.api._
+import scala.concurrent.{Await, Future}
+import Data._
 
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 
 object JirayaBot extends TelegramBot with Polling with Commands  with Authentication{
   def token = "393149916:AAFf7YWkfwhUa2PlXRPXPk-anHmYvusFyco"
+
+  def userFirstTime(chatid: Long, firstName: String): Unit = {
+    Await.result(db.run(
+      users += UserDB(None, chatid, firstName)
+    ), Duration.Inf)
+
+    // here get all projects
+
+    // here get all issues
+
+  }
 
   onCommand("/start") { implicit msg =>
 
@@ -22,15 +36,16 @@ object JirayaBot extends TelegramBot with Polling with Commands  with Authentica
       case _ => ("", "")
     }
     if(username != ""){
-//      match msg.from.map[Option[UserClient]](u => login(u, username, password)) {
       val loginResult = login(msg.from.get, username, password)
       println("login started")
       if(loginResult.isDefined){
+        val user = getUser(msg.source, username)
         val system = ActorSystem("CheckerValidatorSystem")
         val validator = system.actorOf(Props(new Validator(request)), name = "validator")
         val checker = system.actorOf(Props(new Checker((msg.source, loginResult.get), validator)), name = "checker")
         checker ! StartMessage
         reply("login successful")
+        reply(user.toString)
       } else
         reply("login failed")
     } else {

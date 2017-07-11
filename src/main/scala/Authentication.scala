@@ -6,6 +6,10 @@ import info.mukel.telegrambot4s.models.{Message, User}
 import info.mukel.telegrambot4s.api.declarative._
 
 import scala.collection.mutable
+import Data._
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 case object StartMessage
 case class UserClient(user: User, rest: JiraRestClient)
@@ -20,6 +24,7 @@ trait Authentication {
       URI, username, password
     )
     try {
+      // here check if in database, and if not, insert into db
       restClient.getSessionClient.getCurrentSession.claim()
       val uc = UserClient(user, restClient)
       allowed += uc
