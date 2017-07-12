@@ -12,51 +12,75 @@ import collection.JavaConverters._
 object Data {
   val db = Database.forConfig("db")
 
-//  def firstLaunch = {
-//     get all issues and extract projects from them to db
-//
-//     save all issues to db
-//
-//     save all userissues to db
-//  }
-//
+  def firstLaunch(chatid: Long, name: String, userClient: UserClient): Unit = {
+    val user = getUser(chatid, name)
+    updateUserIssues(user, userClient)
+  }
 
-  // completed
   def getIssue(key: String, userClient: UserClient): IssueDB = {
     val issue = Await.result(db.run(issues.filter(_.key === key).result), Duration.Inf)
     if(issue.nonEmpty)
       issue.head
     else {
-      insertIssue(getIssueFromJira(key, userClient))
+      insertIssue(getIssueFromJira(key, userClient), userClient)
     }
   }
 
-  implicit def issue2IssueDB(issue: com.atlassian.jira.rest.client.api.domain.Issue): IssueDB ={
-    IssueDB(None, issue.getKey, issue.getSummary, issue.getDescription, 1L)
+  def getIssuesByUser(user: UserDB, userClient: UserClient): List[IssueDB] = {
+    Await.result(db.run(userissues.filter(_.userId === user.id).result), Duration.Inf).map(x => getIssueById(x.issueId, userClient))
+      .filter(x => x.isDefined)
+      .map(x => x.get).toList
+  }
+
+  def getIssueById(id: Long, userClient: UserClient): Option[IssueDB] = {
+    Await.result(db.run(issues.filter(_.id === id).result), Duration.Inf).headOption
+  }
+
+  implicit def issue2DB(i: (com.atlassian.jira.rest.client.api.domain.Issue, UserClient)): IssueDB = {
+    val project = getProject(i._1.getProject.getKey, i._2)
+    IssueDB(None, i._1.getKey, i._1.getSummary, Option(i._1.getDescription), project.id.get)
   }
 
   def getIssueFromJira(key: String, userClient: UserClient): IssueDB = {
-    userClient.rest.getSearchClient.searchJql(s"key=$key").claim().getIssues.iterator().next()
+    (userClient.rest.getSearchClient.searchJql(s"key=$key, 'maxResults': 1").claim().getIssues.iterator().next(),userClient)
   }
 
-  def insertIssue(issue: IssueDB): IssueDB = {
+  def insertIssue(issue: IssueDB, userClient: UserClient): IssueDB = {
     Await.result(db.run(
       issues += issue
     ), Duration.Inf)
-    issue
+    getIssue(issue.key, userClient)
   }
 //
   def getIssuesByProject(projectKey: String, userClient: UserClient): List[IssueDB] = {
-    val issues = userClient.rest.getSearchClient.searchJql(s"project=$projectKey").claim().getIssues.iterator().asScala.toList
-    for(issue <- issues) yield issue2IssueDB(issue)
+//    userClient.rest.getSearchClient.searchJql(s"project=$projectKey").claim().getIssues.iterator().asScala.toList.map(x => issue2DB(x, userClient))
+    userClient.rest.getSearchClient.searchJql(s"project=$projectKey, 'maxResults': 1").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
+
+  def getIssuesByUserJira(user: UserDB, userClient: UserClient, filters: String = ""): List[IssueDB] = {
+//    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} $filters").claim().getIssues.iterator().asScala.toList.map(x => issue2DB(x, userClient))
+    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName}, 'maxResults': 1 $filters").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+  }
+
+  def getIssuesByUsername(username: String, userClient: UserClient, filters: String = ""): List[IssueDB] = {
+    userClient.rest.getSearchClient.searchJql(s"assignee=$username, 'maxResults': 1 $filters").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+  }
+
 
   def getProject(key: String, userClient: UserClient): ProjectDB = {
     val project = Await.result(db.run(projects.filter(_.key === key).result), Duration.Inf)
     if(project.nonEmpty)
       project.head
     else
-      insertProject(getProjectFromJira(key, userClient))
+      insertProject(getProjectFromJira(key, userClient), userClient)
+  }
+
+  def getProjectById(id: Long, userClient: UserClient): ProjectDB = {
+    Await.result(db.run(projects.filter(_.id === id).result), Duration.Inf).head
+  }
+
+  def getProjectByKey(key: String): ProjectDB = {
+    Await.result(db.run(projects.filter(_.key === key).result), Duration.Inf).head
   }
 
   implicit def project2ProjectDB(project: com.atlassian.jira.rest.client.api.domain.Project): ProjectDB ={
@@ -67,14 +91,22 @@ object Data {
     userClient.rest.getProjectClient.getProject(key).claim()
   }
 
-  def insertProject(project: ProjectDB): ProjectDB = {
-    Await.result(db.run(
-      projects += project
-    ), Duration.Inf)
-    project
+  def getProjectsByUser(user: UserDB, userClient: UserClient): List[ProjectDB] = {
+    getIssuesByUser(user, userClient).map(x => getProjectById(x.projectID, userClient)).distinct
   }
 
-  def getUser(chatid: Long, name: String): UserDB = {
+  def insertProject(project: ProjectDB, userClient: UserClient): ProjectDB = {
+    val x = Await.result(db.run(
+      projects += project
+    ), Duration.Inf)
+    getProject(project.key, userClient)
+  }
+
+  def userFirst(chatid: Long): Boolean = {
+    return !Await.result(db.run(users.filter(_.chatid === chatid).result), Duration.Inf).nonEmpty
+  }
+
+  def getUser(chatid: Long, name: String = ""): UserDB = {
     val user= Await.result(db.run(users.filter(_.chatid === chatid).result), Duration.Inf)
     if(user.nonEmpty)
       user.head
@@ -86,27 +118,45 @@ object Data {
     Await.result(db.run(
       users += user
     ), Duration.Inf)
-    user
+    getUser(user.chatid)
   }
 
-//  def updateUserIssue = {
-//
-//  }
-//     get all issues
-//
-//     compare with saved
-//
-//     if new - extract projects
-//
-//     save to db new projects and issues and push to chat
-//
-//  }
+  def getUserIssue(userId: Long, issueId: Long): UserIssueDB = {
+    val userIssue = Await.result(db.run(userissues.filter(x => x.userId === userId && x.issueId === issueId).result), Duration.Inf)
+    if(userIssue.nonEmpty)
+      userIssue.head
+    else
+      insertUserIssue(UserIssueDB(userId, issueId))
+  }
+
+
+  def getNewUserIssue(userId: Long, issueId: Long): Option[UserIssueDB] = {
+    val userIssue = Await.result(db.run(userissues.filter(x => x.userId === userId && x.issueId === issueId).result), Duration.Inf)
+    if(userIssue.nonEmpty)
+      None
+    else
+      Some(insertUserIssue(UserIssueDB(userId, issueId)))
+  }
+
+  def insertUserIssue(userIssue: UserIssueDB): UserIssueDB = {
+    Await.result(db.run(
+      userissues += userIssue
+    ), Duration.Inf)
+    getUserIssue(userIssue.userId, userIssue.issueId)
+  }
+
+  def updateUserIssues(user: UserDB, userClient: UserClient): List[IssueDB] = {
+//    val userIssues = getIssuesByUser(user, userClient)
+    val userIssues = getIssuesByUserJira(user, userClient)
+    val unfiltered = for(issue <- userIssues) yield getNewUserIssue(user.id.get, issue.id.get)
+    unfiltered.filter(_.isDefined).map(j => getIssueById(j.get.issueId, userClient)).filter(j => j.isDefined).map(_.get)
+  }
 
   case class UserDB(id: Option[Long], chatid: Long, firstName: String)
 
   case class ProjectDB(id: Option[Long], name: String, key: String)
 
-  case class IssueDB(id: Option[Long], key: String, name: String, description: String, projectID: Long)
+  case class IssueDB(id: Option[Long], key: String, name: String, description: Option[String], projectID: Long)
 
   case class UserIssueDB(userId: Long, issueId: Long)
 //  trait UsersTable { this: DbConfiguration =>
@@ -129,7 +179,7 @@ object Data {
 
   class Projects(tag: Tag) extends Table[ProjectDB](tag, "PROJECTS") {
     // Columns
-    def id = column[Option[Long]]("PROJECT_ID", O.PrimaryKey)
+    def id = column[Option[Long]]("PROJECT_ID", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("PROJECT_NAME", O.Length(64))
 
@@ -143,13 +193,13 @@ object Data {
 
   class Issues(tag: Tag) extends Table[IssueDB](tag, "ISSUES") {
     // Columns
-    def id = column[Option[Long]]("ISSUE_ID", O.PrimaryKey)
+    def id = column[Option[Long]]("ISSUE_ID", O.PrimaryKey, O.AutoInc)
 
     def key = column[String]("ISSUE_KEY", O.Length(10))
 
     def name = column[String]("ISSUE_NAME", O.Length(64))
 
-    def description = column[String]("ISSUE_DESCRIPTION", O.Length(4000))
+    def description = column[Option[String]]("ISSUE_DESCRIPTION", O.Length(4000))
 
     def projectID = column[Long]("PROJECT_ID")
     // Select

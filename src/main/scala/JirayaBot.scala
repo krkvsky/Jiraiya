@@ -1,33 +1,80 @@
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.atlassian.jira.rest.client.api.JiraRestClient
 import com.atlassian.jira.rest.client.api.domain.Issue
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.api.declarative._
-import info.mukel.telegrambot4s.methods.{ParseMode, SendMessage}
-import info.mukel.telegrambot4s.models.Message
+import info.mukel.telegrambot4s.methods.{EditMessageReplyMarkup, ParseMode, SendMessage}
+import info.mukel.telegrambot4s.models.{InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup}
 import info.mukel.telegrambot4s.Implicits._
 import slick.driver.SQLiteDriver.api._
-import scala.concurrent.{Await, Future}
+
+import scala.concurrent.duration._
 import Data._
+//import akka.stream.actor.ActorPublisher.Internal.Canceled
+import org.apache.http.concurrent.Cancellable
 
 import scala.concurrent.duration.Duration
 
-object JirayaBot extends TelegramBot with Polling with Commands  with Authentication{
+object JirayaBot extends TelegramBot with Polling with Commands with Callbacks with Authentication {
   def token = "393149916:AAFf7YWkfwhUa2PlXRPXPk-anHmYvusFyco"
 
-  def userFirstTime(chatid: Long, firstName: String): Unit = {
-    Await.result(db.run(
-      users += UserDB(None, chatid, firstName)
-    ), Duration.Inf)
+  def projectTag = prefixTag("PROJECTS_TAG") _
+  def issueTag = prefixTag("ISSUES_TAG") _
 
-    // here get all projects
-
-    // here get all issues
-
+  def markupProjects(projects: List[ProjectDB]) = {
+    InlineKeyboardMarkup(Seq(projects.map(x => InlineKeyboardButton.callbackData(
+      s"Project ${x.key}",
+      projectTag(x.key))).toSeq
+    )
+    )
+  }
+  def markupIssues(issues: List[IssueDB]) = {
+    InlineKeyboardMarkup(Seq(issues.take(5).map(x => InlineKeyboardButton.callbackData(
+      s"${x.key}",
+      issueTag(x.key))).toSeq
+    )
+    )
   }
 
-  onCommand("/start") { implicit msg =>
+  onCallbackWithTag("PROJECTS_TAG") { implicit cbq =>
+    val user = isAuthenticated(cbq.from).get
+    // Notification only shown to the user who pressed the button.
+    ackCallback(cbq.from.firstName + " pressed the button!")
+    // Or just ackCallback()
+    val project = getProjectByKey(cbq.data.get)
+    println(project)
+    println(cbq.data.get)
+    println(s"Project id: $project.id")
+    val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+    println("final")
+    request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues)))
+    }
 
+  onCallbackWithTag("ISSUES_TAG") { implicit cbq =>
+    val user = isAuthenticated(cbq.from).get
+    // Notification only shown to the user who pressed the button.
+    ackCallback(cbq.from.firstName + " pressed the button!")
+    // Or just ackCallback()
+    val issue = getIssue(cbq.data.get, user)
+    request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown)))
+  }
+
+
+  onCommand("/start") { implicit msg =>
+    reply("TYPE FUCKING /login TO GUESS WHATT ?? TO LOGIN MAYBE YOU STUPID REDO")
+  }
+
+  onCommand("/projects") { implicit msg =>
+    authenticatedOrElse {
+      admin => {
+        val projects = getProjectsByUser(getUser(msg.source), admin)
+        println(projects)
+        reply("Projects: ", replyMarkup = markupProjects(projects))
+      }
+    } /* or else */ {
+      user =>
+        reply(s"${user.firstName}, you must /login first.")
+    }
   }
 
   onCommand("/login") { implicit msg =>
@@ -37,15 +84,17 @@ object JirayaBot extends TelegramBot with Polling with Commands  with Authentica
     }
     if(username != ""){
       val loginResult = login(msg.from.get, username, password)
-      println("login started")
+      reply("wait a minute to synchronize your data")
       if(loginResult.isDefined){
-        val user = getUser(msg.source, username)
+        val user = if(userFirst(msg.source)){
+          println("yarik idi nahui")
+          firstLaunch(msg.source, username, loginResult.get)
+        } else getUser(msg.source, username)
         val system = ActorSystem("CheckerValidatorSystem")
         val validator = system.actorOf(Props(new Validator(request)), name = "validator")
         val checker = system.actorOf(Props(new Checker((msg.source, loginResult.get), validator)), name = "checker")
-        checker ! StartMessage
+//        checker ! StartMessage
         reply("login successful")
-        reply(user.toString)
       } else
         reply("login failed")
     } else {
@@ -89,24 +138,11 @@ object JirayaBot extends TelegramBot with Polling with Commands  with Authentica
 
   }
 
-  onCommand("/issues"){ implicit msg =>
+  onCommand("/issues") { implicit msg =>
     authenticatedOrElse {
       admin => {
-        reply("PASS")
-      }
-    } { user =>
-      reply(s"${user.firstName}, you must /login first.")
-    }
-
-  }
-
-  onCommand("/secret") { implicit msg =>
-    authenticatedOrElse {
-      admin => {
-        val myProjects = admin.rest.getSearchClient().searchJql(s"project in projectsWhereUserHasRole('Developers') and assignee=${admin.rest.getSessionClient().getCurrentSession.claim().getUsername} and updated < '-2w' order by updated desc")
-//        println(myProjects.claim().getIssues().iterator().next().toString)
-        val issue = myProjects.claim().getIssues().iterator().next()
-        reply(issue.getKey + ":\n" + issue.getDescription)
+        val issues = getIssuesByUsername(getUser(msg.source).firstName, admin)
+        issues.foreach(x => reply(x.key + ":\n" + x.description))
       }
     } /* or else */ {
       user =>
@@ -121,30 +157,34 @@ object JirayaBot extends TelegramBot with Polling with Commands  with Authentica
 //    f
 //  }
 
+  def showIssues(iss : List[IssueDB]): List[String] ={
+    iss.map(showIssue)
+  }
+
+  def briefIssues(iss : List[IssueDB]): List[String] ={
+    iss.map(briefIssue)
+  }
+
+  def showIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n `${iss.description}`"
+  def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})"
 
   class Checker(tup: (Long, UserClient), validator: ActorRef) extends Actor {
     def receive = {
       case StartMessage =>
-        println("im here")
-        val issue = Issue("a")
-        // here check for issues
-        if(true)
-          validator ! (tup._1, tup._2.rest, issue)
+        while(isAuthenticated(tup._2.user).isDefined) {
+          val issues = updateUserIssues(getUser(tup._1), tup._2)
+          validator ! (tup._1, issues)
+          Thread.sleep(50000)
+        }
+        validator ! PoisonPill
+        self ! PoisonPill
     }
   }
 
   class Validator(req: RequestHandler) extends Actor {
     def receive = {
-      case (chatID: Long, rest: JiraRestClient, issue: Issue) =>
-        // check issue in user cache
-//        if(false) // if not in cache
-        val myProjects = rest.getSearchClient().searchJql(s"project in projectsWhereUserHasRole('Developers') and assignee=${rest.getSessionClient().getCurrentSession.claim().getUsername} and updated < '-2d' order by updated desc")
-        //        println(myProjects.claim().getIssues().iterator().next().toString)
-        myProjects.claim().getIssues().forEach( iss => req(SendMessage(chatID, iss.getKey)))
-
-//        req(SendMessage(chatID, issue.name))
-//        for(x <- 0 until 10)
-//          req(SendMessage(chatID, x.toString))
+      case (chatID: Long, l: List[IssueDB])=>
+        briefIssues(l).foreach(x => req(SendMessage(chatID, x, Some(ParseMode.Markdown))))
     }
   }
 }

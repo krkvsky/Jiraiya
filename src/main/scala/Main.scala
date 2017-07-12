@@ -13,46 +13,15 @@ import scala.concurrent.Await
 import scala.util.{Failure, Success}
 
 object Main extends App{
-  JirayaBot.run()
-
 //  Await.result(db.run(setup), Duration.Inf)
-
-  //  Await.result(db.run(
-//    DBIO.seq(
-//      users += UserDB(None, 1, "my"),
-//      projects += ProjectDB(None, "Geeksy.ml", "GEEKS"),
-//      issues ++= Seq(
-//        IssueDB(None, "GEEKS-992", "Let's do it", "alo", 1L),
-//        IssueDB(None, "GEEKS-993", "Let's do it2", "alo", 1L)
-//      ),
-//      userissues += UserIssueDB(8, 1)
-//    )
-//  ), Duration.Inf)
-//  val q1 = users.map(x => x)
-//  val action = q1.result
-//  val result = db.run(action)
-
-//  println(Await.result(result, Duration.Inf))
-
-//  println(result)
-
-//  if (result.isCompleted) {
-//    result.foreach(x => println(x))
-//    val last = result.result(10 seconds)
-//    println(last)
-//  }
-
-//  val system = ActorSystem("PingPongSystem")
-//  val pong = system.actorOf(Props[Pong], name = "pong")
-//  val ping = system.actorOf(Props(new Ping(pong)), name = "ping")
-//
-//  ping ! StartMessage
-
+  JirayaBot.run()
 //  val URI =  new URI("http://jira.tallium.com:8085")
 
 //  val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
 //    URI, "YaroslavK", "last:partizan"
 //  )
+//  val user = new info.mukel.telegrambot4s.models.User(1, "a")
+//  firstLaunch(257888125L, "yaroslavk", UserClient(user, restClient))
 //  try {
 //    restClient.getSessionClient().getCurrentSession().claim()
 //    println("A")
@@ -65,7 +34,10 @@ object Main extends App{
 //  println(iss)
 //  val restAuthClient = new AsynchronousJiraRestClientFactory().
 //  val me = restClient.getUserClient().getUser("yaroslavk")
-//  val projectGEEKS = restClient.getSearchClient().searchJql("project=GEEKS AND assignee=yaroslavk AND status = done")
+//  val projectGEEKS = restClient.getSearchClient().searchJql("assignee=yaroslavk", 1, 1, Set("nice", "nice"))
+//  var c = 0
+//  projectGEEKS.claim().getIssues.forEach(x => c += 1)
+//  println(c)
 //val myProjects = restClient.getSearchClient().searchJql("project in projectsWhereUserHasRole('Developers') and assignee=yaroslavk and updated < '-2w' order by updated desc")
 //  println(myProjects.claim().getIssues().iterator().next())
 //  restClient.getComponentClient()
