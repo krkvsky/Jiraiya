@@ -1,20 +1,25 @@
+import java.util
+
 import com.atlassian.jira.rest.client.api.domain.BasicIssue
 import slick.driver.SQLiteDriver.api._
 import slick.jdbc.{JdbcProfile, SQLiteProfile}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import com.atlassian.jira.rest.client.api.domain._
+import org.joda.time.DateTime
+
 import collection.JavaConverters._
 
 
 object Data {
   val db = Database.forConfig("db")
 
-  def firstLaunch(chatid: Long, name: String, userClient: UserClient): Unit = {
+  def firstLaunch(chatid: Long, name: String, userClient: UserClient): UserDB = {
     val user = getUser(chatid, name)
     updateUserIssues(user, userClient)
+    user
   }
 
   def getIssue(key: String, userClient: UserClient): IssueDB = {
@@ -38,11 +43,13 @@ object Data {
 
   implicit def issue2DB(i: (com.atlassian.jira.rest.client.api.domain.Issue, UserClient)): IssueDB = {
     val project = getProject(i._1.getProject.getKey, i._2)
-    IssueDB(None, i._1.getKey, i._1.getSummary, Option(i._1.getDescription), project.id.get)
+    IssueDB(None, i._1.getKey, i._1.getSummary, i._1.getStatus.getName, i._1.getUpdateDate.toString, Option(i._1.getDescription), project.id.get)
   }
 
   def getIssueFromJira(key: String, userClient: UserClient): IssueDB = {
-    (userClient.rest.getSearchClient.searchJql(s"key=$key, 'maxResults': 1").claim().getIssues.iterator().next(),userClient)
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+    (userClient.rest.getSearchClient.searchJql(s"key=$key", Int.MaxValue, 0, set).claim().getIssues.iterator().next(),userClient)
   }
 
   def insertIssue(issue: IssueDB, userClient: UserClient): IssueDB = {
@@ -54,16 +61,36 @@ object Data {
 //
   def getIssuesByProject(projectKey: String, userClient: UserClient): List[IssueDB] = {
 //    userClient.rest.getSearchClient.searchJql(s"project=$projectKey").claim().getIssues.iterator().asScala.toList.map(x => issue2DB(x, userClient))
-    userClient.rest.getSearchClient.searchJql(s"project=$projectKey, 'maxResults': 1").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    userClient.rest.getSearchClient.searchJql(s"project=$projectKey order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
   def getIssuesByUserJira(user: UserDB, userClient: UserClient, filters: String = ""): List[IssueDB] = {
 //    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} $filters").claim().getIssues.iterator().asScala.toList.map(x => issue2DB(x, userClient))
-    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName}, 'maxResults': 1 $filters").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} order by created", Int.MaxValue, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+  }
+
+  def getIssuesByUserJiraFirst(user: UserDB, userClient: UserClient, filters: String = ""): List[IssueDB] = {
+    //    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} $filters").claim().getIssues.iterator().asScala.toList.map(x => issue2DB(x, userClient))
+
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
   def getIssuesByUsername(username: String, userClient: UserClient, filters: String = ""): List[IssueDB] = {
-    userClient.rest.getSearchClient.searchJql(s"assignee=$username, 'maxResults': 1 $filters").claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    userClient.rest.getSearchClient.searchJql(s"assignee=$username order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
 
@@ -130,12 +157,28 @@ object Data {
   }
 
 
-  def getNewUserIssue(userId: Long, issueId: Long): Option[UserIssueDB] = {
+  def getNewUserIssue(userId: Long, issueId: Long, userClient: UserClient): Option[UserIssueDB] = {
     val userIssue = Await.result(db.run(userissues.filter(x => x.userId === userId && x.issueId === issueId).result), Duration.Inf)
-    if(userIssue.nonEmpty)
-      None
-    else
+    if(userIssue.nonEmpty) {
+      val issue = getIssueById(issueId, userClient).get
+      val jiraIssue = getIssueFromJira(issue.key, userClient)
+      if(jiraIssue.updatedAt == issue.updatedAt) {
+        println("not new and updated")
+        None
+      }
+      else{
+        val iss = issues.filter(x => x.id === issueId)
+        val q = for { i <- iss } yield i.updatedAt
+        val action = q.update(jiraIssue.updatedAt)
+        Await.result(db.run(action), Duration.Inf)
+        println("updated " + issueId)
+        Some(UserIssueDB(userId, issueId))
+      }
+    }
+    else {
+      println("new " + issueId)
       Some(insertUserIssue(UserIssueDB(userId, issueId)))
+    }
   }
 
   def insertUserIssue(userIssue: UserIssueDB): UserIssueDB = {
@@ -147,16 +190,26 @@ object Data {
 
   def updateUserIssues(user: UserDB, userClient: UserClient): List[IssueDB] = {
 //    val userIssues = getIssuesByUser(user, userClient)
-    val userIssues = getIssuesByUserJira(user, userClient)
-    val unfiltered = for(issue <- userIssues) yield getNewUserIssue(user.id.get, issue.id.get)
+    println("START SYNCHRONIZE " + user.firstName)
+    val userIssues = getIssuesByUserJiraFirst(user, userClient)
+    val unfiltered = for(issue <- userIssues) yield getNewUserIssue(user.id.get, issue.id.get, userClient)
+    println("END OF SYNCHRONIZE")
     unfiltered.filter(_.isDefined).map(j => getIssueById(j.get.issueId, userClient)).filter(j => j.isDefined).map(_.get)
   }
+
+  def updateUserIssuesActor(user: UserDB, userClient: UserClient): List[IssueDB] = {
+    //    val userIssues = getIssuesByUser(user, userClient)
+    val userIssues = getIssuesByUserJira(user, userClient)
+    val unfiltered = for(issue <- userIssues) yield getNewUserIssue(user.id.get, issue.id.get, userClient)
+    unfiltered.filter(_.isDefined).map(j => getIssueById(j.get.issueId, userClient)).filter(j => j.isDefined).map(_.get)
+  }
+
 
   case class UserDB(id: Option[Long], chatid: Long, firstName: String)
 
   case class ProjectDB(id: Option[Long], name: String, key: String)
 
-  case class IssueDB(id: Option[Long], key: String, name: String, description: Option[String], projectID: Long)
+  case class IssueDB(id: Option[Long], key: String, name: String, status: String, updatedAt: String, description: Option[String], projectID: Long)
 
   case class UserIssueDB(userId: Long, issueId: Long)
 //  trait UsersTable { this: DbConfiguration =>
@@ -199,11 +252,15 @@ object Data {
 
     def name = column[String]("ISSUE_NAME", O.Length(64))
 
+    def status = column[String]("ISSUE_STATUS", O.Length(100))
+
     def description = column[Option[String]]("ISSUE_DESCRIPTION", O.Length(4000))
+
+    def updatedAt = column[String]("ISSUE_UPDATED_AT")
 
     def projectID = column[Long]("PROJECT_ID")
     // Select
-    def * = (id, key, name, description, projectID) <> (IssueDB.tupled, IssueDB.unapply)
+    def * = (id, key, name, status, updatedAt, description, projectID) <> (IssueDB.tupled, IssueDB.unapply)
     def project = foreignKey("PRO_FK", projectID, projects)(_.id.get)
   }
 

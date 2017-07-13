@@ -10,6 +10,8 @@ import slick.driver.SQLiteDriver.api._
 
 import scala.concurrent.duration._
 import Data._
+
+import scala.concurrent.Future
 //import akka.stream.actor.ActorPublisher.Internal.Canceled
 import org.apache.http.concurrent.Cancellable
 
@@ -22,17 +24,18 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
   def issueTag = prefixTag("ISSUES_TAG") _
 
   def markupProjects(projects: List[ProjectDB]) = {
-    InlineKeyboardMarkup(Seq(projects.map(x => InlineKeyboardButton.callbackData(
-      s"Project ${x.key}",
-      projectTag(x.key))).toSeq
-    )
+    InlineKeyboardMarkup(projects.grouped(2).map(y => y.map(x => InlineKeyboardButton.callbackData(
+        s"Project ${x.key}",
+        projectTag(x.key)))
+      ).toSeq
     )
   }
+
   def markupIssues(issues: List[IssueDB]) = {
-    InlineKeyboardMarkup(Seq(issues.take(5).map(x => InlineKeyboardButton.callbackData(
+    InlineKeyboardMarkup(issues.take(5).grouped(3).map(y => y.map(x => InlineKeyboardButton.callbackData(
       s"${x.key}",
       issueTag(x.key))).toSeq
-    )
+    ).toSeq
     )
   }
 
@@ -84,16 +87,15 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     }
     if(username != ""){
       val loginResult = login(msg.from.get, username, password)
-      reply("wait a minute to synchronize your data")
+      reply("wait few minutes to synchronize your data")
       if(loginResult.isDefined){
-        val user = if(userFirst(msg.source)){
-          println("yarik idi nahui")
+        val user: UserDB = if(userFirst(msg.source)){
           firstLaunch(msg.source, username, loginResult.get)
         } else getUser(msg.source, username)
         val system = ActorSystem("CheckerValidatorSystem")
         val validator = system.actorOf(Props(new Validator(request)), name = "validator")
         val checker = system.actorOf(Props(new Checker((msg.source, loginResult.get), validator)), name = "checker")
-//        checker ! StartMessage
+        checker ! StartMessage
         reply("login successful")
       } else
         reply("login failed")
@@ -150,13 +152,6 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     }
   }
 
-
-//  def f: Unit = Future {
-//    Thread.sleep(2000)
-//    request(SendMessage(257888125L, "saske"))
-//    f
-//  }
-
   def showIssues(iss : List[IssueDB]): List[String] ={
     iss.map(showIssue)
   }
@@ -165,16 +160,19 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     iss.map(briefIssue)
   }
 
-  def showIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n `${iss.description}`"
-  def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})"
+  def showIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n" +
+    s"STATUS: ${iss.status} \n" +
+    s" ${iss.description.getOrElse("None description provided :(")}"
+  def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n STATUS: ${iss.status}"
 
   class Checker(tup: (Long, UserClient), validator: ActorRef) extends Actor {
     def receive = {
       case StartMessage =>
         while(isAuthenticated(tup._2.user).isDefined) {
-          val issues = updateUserIssues(getUser(tup._1), tup._2)
-          validator ! (tup._1, issues)
-          Thread.sleep(50000)
+          val issues = updateUserIssuesActor(getUser(tup._1), tup._2)
+          if(issues.nonEmpty)
+            validator ! (tup._1, issues)
+          Thread.sleep(120000)
         }
         validator ! PoisonPill
         self ! PoisonPill
@@ -184,7 +182,10 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
   class Validator(req: RequestHandler) extends Actor {
     def receive = {
       case (chatID: Long, l: List[IssueDB])=>
-        briefIssues(l).foreach(x => req(SendMessage(chatID, x, Some(ParseMode.Markdown))))
+        if(l.length < 25) {
+          req(SendMessage(chatID, "YOU HAVE NEW AND UPDATED ISSUES: "))
+          showIssues(l).foreach(x => req(SendMessage(chatID, x, Some(ParseMode.Markdown))))
+        }
     }
   }
 }
