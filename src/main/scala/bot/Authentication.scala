@@ -1,19 +1,17 @@
+package bot
+
 import java.net.URI
 
 import com.atlassian.jira.rest.client.api.JiraRestClient
 import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory
+import info.mukel.telegrambot4s.api.declarative.Action
 import info.mukel.telegrambot4s.models.{Message, User}
-import info.mukel.telegrambot4s.api.declarative._
 
 import scala.collection.mutable
-import Data._
 
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-
+case class Issue(name: String)
 case object StartMessage
 case class UserClient(user: User, rest: JiraRestClient)
-case class Issue(name: String)
 
 trait Authentication {
   val allowed: mutable.Set[UserClient] = scala.collection.mutable.Set[UserClient]()
