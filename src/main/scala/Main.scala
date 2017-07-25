@@ -5,6 +5,7 @@ import akka.actor.{ActorSystem, Props}
 import com.atlassian.jira.rest.client.internal.async._
 import com.atlassian.jira.rest.client.api.IssueRestClient
 import com.atlassian.jira.rest.client.api.domain.input.WorklogInput
+import org.joda.time.DateTime
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -17,11 +18,22 @@ import collection.JavaConverters._
 object Main extends App{
 //  Await.result(db.run(setup), Duration.Inf)
   JirayaBot.run()
-//  val URI =  new URI("http://jira.tallium.com:8085")
+//  val ur =  new URI("http://jira.tallium.com:8085")
 
 //  val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
-//    URI, "YaroslavK", "last:partizan"
+//    ur, "YaroslavK", "last:partizan"
 //  )
+//  var set = new java.util.HashSet[String]()
+//  set.add("*all")
+//  val issue = restClient.getSearchClient.searchJql(s"key=WSH-20", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
+//  val worklogURI = issue.getWorklogUri
+//  val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(1500906617146L), 10, null)
+//  issue.getWorklogs.forEach(println(_))
+
+//  val worklog: Iterator =
+//  val worklogURI: URI = new URI("http://jira.tallium.com:8085/issue/WSH-20/worklog")
+
+//  restClient.getIssueClient.addWorklog(worklogURI, worklog)
 //  val user = new info.mukel.telegrambot4s.models.User(1, "a")
 //  firstLaunch(257888125L, "yaroslavk", UserClient(user, restClient))
 //  try {
