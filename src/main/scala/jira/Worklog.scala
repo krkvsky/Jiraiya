@@ -11,11 +11,12 @@ import models.Issues._
   */
 object Worklog {
 
-  def addWorklog(current: IssueWorkingDB, startAt: Long, workToLog: Long, key: String, userClient: UserClient)  = {
+  def addWorklog(current: IssueWorkingDB, startAt: Long, workToLog: Long, userClient: UserClient): String  = {
     val issue = Issue.getOriginalIssueFromJira(getIssueById(current.issueId, userClient).get.key, userClient)
     val worklogURI = issue.getWorklogUri
     val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(startAt), Util.millisToMinutes(workToLog), null)
     userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
+    issue.getKey
   }
 
   def getWorklogByUser(user: UserDB, userClient: UserClient) = {

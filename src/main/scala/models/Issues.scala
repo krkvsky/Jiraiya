@@ -5,6 +5,7 @@ import Projects._
 import UserIssues._
 import bot.UserClient
 import jira.Issue._
+import bot.Util._
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -55,7 +56,7 @@ object Issues {
   def getIssuesByUser(user: UserDB, userClient: UserClient): List[IssueDB] = {
     Await.result(db.run(userissues.filter(_.userId === user.id).result), Duration.Inf).map(x => getIssueById(x.issueId, userClient))
       .filter(x => x.isDefined)
-      .map(x => x.get).toList
+      .map(x => x.get).filterNot(x => issueIsResolved(x)).toList
   }
 
   def getIssueById(id: Long, userClient: UserClient): Option[IssueDB] = {

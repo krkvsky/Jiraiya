@@ -5,6 +5,7 @@ import org.joda.time.DateTime
 import slick.driver.SQLiteDriver.api._
 import Users.users
 import Issues._
+import jira.Worklog._
 import jira.Issue._
 import bot.{UserClient, Util}
 
@@ -60,11 +61,11 @@ object IssueWorking {
       val previous = if(curr.continuedAt != 0) curr.continuedAt else curr.startedAt
       println("Start pause")
       val workToLog = System.currentTimeMillis() - previous
-
-      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
-      val worklogURI = issue.getWorklogUri
-      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
-      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
+      addWorklog(curr, previous, workToLog, userClient)
+//      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
+//      val worklogURI = issue.getWorklogUri
+//      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
+//      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
       println("end pause")
       val newTime = curr.time + workToLog
       Await.result(
@@ -91,19 +92,19 @@ object IssueWorking {
     if(current.isDefined) {
       val curr = current.get
       val previous = if(curr.continuedAt != 0) curr.continuedAt else curr.startedAt
-      println("Start finish")
       val workToLog = System.currentTimeMillis() - previous
-      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
-      val worklogURI = issue.getWorklogUri
-      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
-      println("End finish")
-      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
+      val key = addWorklog(curr, previous, workToLog, userClient)
+//      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
+//      val worklogURI = issue.getWorklogUri
+//      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
+//      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
       val newTime = curr.time + workToLog
       Await.result(
         db.run(
           issueworking.filter(x => x.issueId === curr.issueId && x.userId === curr.userId).map(x => (x.time, x.finished)).update(newTime, true)
         ), Duration.Inf
       )
+      moveIssueToTesting(key, userClient)
       newTime
     }else
       0

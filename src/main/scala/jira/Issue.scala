@@ -1,9 +1,9 @@
 package jira
 
 import bot.UserClient
+import com.atlassian.jira.rest.client.api.domain.input.TransitionInput
 import models._
 import models.Issues._
-
 
 import collection.JavaConverters._
 
@@ -17,6 +17,23 @@ object Issue {
     set.add("*all")
     (userClient.rest.getSearchClient.searchJql(s"key=$key", Int.MaxValue, 0, set).claim().getIssues.iterator().next(), userClient)
   }
+
+
+
+  def moveIssueToTesting(key: String, userClient: UserClient) = {
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    val iss = userClient.rest.getSearchClient.searchJql(s"key=OTHR-372", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
+    val transitions = userClient.rest.getIssueClient.getTransitions(iss.getTransitionsUri)
+    val tranId = transitions.claim().iterator().asScala.toList.filter(x =>
+      x.getName.toLowerCase == "in review"
+        ||
+        x.getName.toLowerCase == "in testing"
+    ).toList.head.getId
+    userClient.rest.getIssueClient.transition(iss, new TransitionInput(tranId))
+  }
+
 
   def getOriginalIssueFromJira(key: String, userClient: UserClient) = {
     var set = new java.util.HashSet[String]()
@@ -59,5 +76,8 @@ object Issue {
     userClient.rest.getSearchClient.searchJql(s"assignee=$username order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
+  def updateIssueStatus(key: String, userClient: UserClient) = {
+
+  }
 
 }
