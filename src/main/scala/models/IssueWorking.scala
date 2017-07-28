@@ -47,9 +47,11 @@ object IssueWorking {
 
 
   def startIssueWorkingOn(issue: IssueDB, user: UserDB, userClient: UserClient) = {
+    val key = getIssueById(issue.id.get, userClient).get.key
     Await.result(db.run(
       issueworking += IssueWorkingDB(user.id.getOrElse(0), issue.id.getOrElse(0), System.currentTimeMillis(), 0, 0, false, false)
     ), Duration.Inf)
+    moveIssueToInProgress(key, userClient)
   }
 
   def pauseIssueWorkingOn(user: UserDB, userClient: UserClient) = {

@@ -28,8 +28,9 @@ object Main extends App{
 //  var set = new java.util.HashSet[String]()
 //  set.add("*all")
 //
-//  val iss = restClient.getSearchClient.searchJql(s"key=OTHR-372", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
+//  val iss = restClient.getSearchClient.searchJql(s"key=WSH-59", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
 //  val transitions = restClient.getIssueClient.getTransitions(iss.getTransitionsUri)
+//  println(transitions.claim().iterator().asScala.toList)
 //  val tranId = transitions.claim().iterator().asScala.toList.filter(x =>
 //    x.getName.toLowerCase == "in review"
 //      ||

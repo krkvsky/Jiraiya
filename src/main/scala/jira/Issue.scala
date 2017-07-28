@@ -24,7 +24,7 @@ object Issue {
     var set = new java.util.HashSet[String]()
     set.add("*all")
 
-    val iss = userClient.rest.getSearchClient.searchJql(s"key=OTHR-372", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
+    val iss = userClient.rest.getSearchClient.searchJql(s"key=$key", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
     val transitions = userClient.rest.getIssueClient.getTransitions(iss.getTransitionsUri)
     val tranId = transitions.claim().iterator().asScala.toList.filter(x =>
       x.getName.toLowerCase == "in review"
@@ -33,6 +33,21 @@ object Issue {
     ).toList.head.getId
     userClient.rest.getIssueClient.transition(iss, new TransitionInput(tranId))
   }
+
+  def moveIssueToInProgress(key: String, userClient: UserClient) = {
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+
+    val iss = userClient.rest.getSearchClient.searchJql(s"key=$key", Int.MaxValue, 0, set).claim().getIssues.iterator().next()
+    val transitions = userClient.rest.getIssueClient.getTransitions(iss.getTransitionsUri)
+    val tranId = transitions.claim().iterator().asScala.toList.filter(x =>
+      x.getName.toLowerCase.contains("work started")
+        ||
+        x.getName.toLowerCase.contains("in progress")
+    ).toList.head.getId
+    userClient.rest.getIssueClient.transition(iss, new TransitionInput(tranId))
+  }
+
 
 
   def getOriginalIssueFromJira(key: String, userClient: UserClient) = {
