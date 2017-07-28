@@ -22,11 +22,13 @@ object Markup {
     )
   }
 
-  def markupIssues(issues: List[IssueDB]) = {
-    InlineKeyboardMarkup(issues.take(5).grouped(3).map(y => y.map(x => InlineKeyboardButton.callbackData(
-      s"${x.key}",
-      issueTag(x.key))).toSeq
-    ).toSeq
+  def markupIssues(issues: List[IssueDB], projectKey: String, offset: Int = 0) = {
+    print("WE ARE HERE")
+    InlineKeyboardMarkup(InlineKeyboardButton.callbackData("<", projectTag(s"$projectKey^${offset-5}")) ++
+      issues.slice(offset, offset + 5).grouped(1).map(y => y.map(x => InlineKeyboardButton.callbackData(
+        s"${x.key}: ${x.name}",
+        issueTag(x.key))).toSeq
+      ).toSeq ++ InlineKeyboardButton.callbackData(">", projectTag(s"$projectKey^${offset+5}"))
     )
   }
 

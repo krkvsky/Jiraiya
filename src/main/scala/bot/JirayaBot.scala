@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import info.mukel.telegrambot4s.Implicits._
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.api.declarative._
-import info.mukel.telegrambot4s.methods.{ParseMode, SendMessage}
+import info.mukel.telegrambot4s.methods.{EditMessageReplyMarkup, ParseMode, SendMessage}
 import models._
 import models.Projects._
 import models.Issues._
@@ -29,13 +29,23 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     // Notification only shown to the user who pressed the button.
     ackCallback(cbq.from.firstName + " pressed the button!")
     // Or just ackCallback()
-    val project = getProjectByKey(cbq.data.get)
-    println(project)
-    println(cbq.data.get)
-    println(s"Project id: $project.id")
-    val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
-    println("final")
-    request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues)))
+    val (key, offs) = cbq.data.get.splitAt(cbq.data.get.indexOf("^"))
+    if (key.isEmpty){
+      val project = getProjectByKey(offs)
+      println(project)
+      println(cbq.data.get)
+      println(s"Project id: $project.id")
+      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+      println("final")
+      request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues, cbq.data.get)))
+    } else {
+      val offset = offs.drop(1).toInt
+      val project = getProjectByKey(key)
+      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+      if(issues.slice(offset, offset+5).nonEmpty)
+        request(EditMessageReplyMarkup(cbq.message.get.source, cbq.message.get.messageId, replyMarkup = markupIssues(issues, key, offset)))
+//      request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues, key, offs.drop(1).toInt)))
+    }
   }
 
   onCallbackWithTag("ISSUES_TAG") { implicit cbq =>
@@ -43,12 +53,12 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     // Notification only shown to the user who pressed the button.
     ackCallback(cbq.from.firstName + " pressed the button!")
     // Or just ackCallback()
+    val query = cbq.data.get
     val issue = getIssue(cbq.data.get, user)
-    if(getIssueWorkingOn(getUser(cbq.message.get.source), user).isDefined)
+    if (getIssueWorkingOn(getUser(cbq.message.get.source), user).isDefined)
       request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown)))
     else
       request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown), replyMarkup = markupInteractive(issue)))
-
   }
 
   onCallbackWithTag("INTERACTIVE_TAG") { implicit cbq =>
