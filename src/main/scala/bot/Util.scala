@@ -18,7 +18,7 @@ object Util {
   def showIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n" +
     s"STATUS: ${iss.status} \n" +
     s" ${iss.description.getOrElse("None description provided :(")}"
-  def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key})\n STATUS: ${iss.status}"
+  def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key}) ${iss.name}"
 
   def issueIsResolved(iss: IssueDB): Boolean = {
     List("In Review", "Resolved", "Closed", "Done").contains(iss.status)

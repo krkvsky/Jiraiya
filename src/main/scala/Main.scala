@@ -25,6 +25,11 @@ object Main extends App{
 //  val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
 //    ur, "YaroslavK", "last:partizan"
 //  )
+//  val temp = restClient.getSearchClient.searchJql("worklogAuthor = currentUser() AND worklogDate > '2017/7/26'").claim().getIssues.iterator().asScala.toList
+//  println(temp.head.getField("progress").getValue.toString.drop(12).take(5))
+//
+//  val dt = new org.joda.time.DateTime()
+//  println("%s/%s/%s".format(dt.year().get(), dt.monthOfYear().getAsString, dt.dayOfMonth().get()))
 //  var set = new java.util.HashSet[String]()
 //  set.add("*all")
 //

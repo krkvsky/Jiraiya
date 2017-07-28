@@ -91,8 +91,19 @@ object Issue {
     userClient.rest.getSearchClient.searchJql(s"assignee=$username order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
-  def updateIssueStatus(key: String, userClient: UserClient) = {
-
+  def getUserWorklogs(date: org.joda.time.DateTime, userClient: UserClient): Map[IssueDB, Long] = {
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+    val dt = "%s/%s/%s".format(date.year().get(), date.monthOfYear().getAsString, date.dayOfMonth().get())
+    println(dt)
+    val temp = userClient.rest.getSearchClient.searchJql(s"worklogAuthor = currentUser() AND worklogDate = '$dt'", Int.MaxValue, 0, set).claim().getIssues.iterator().asScala.toList
+    temp.map(x => issue2DB(x, userClient) -> x.getField("progress").getValue.toString.slice(12, 17).toLong).toMap
   }
 
+  def getUserYesterdayWorklogs(userClient: UserClient): Map[IssueDB, Long] = {
+    var set = new java.util.HashSet[String]()
+    set.add("*all")
+    val temp = userClient.rest.getSearchClient.searchJql(s"worklogAuthor = currentUser() AND worklogDate = -1d", Int.MaxValue, 0, set).claim().getIssues.iterator().asScala.toList
+    temp.map(x => issue2DB(x, userClient) -> x.getField("progress").getValue.toString.slice(12, 17).toLong).toMap
+  }
 }

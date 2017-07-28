@@ -9,7 +9,7 @@ import bot.Util._
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-
+import scala.collection.JavaConverters._
 
 case class IssueDB(id: Option[Long], key: String, name: String, status: String, updatedAt: String, description: Option[String], projectID: Long)
 
@@ -62,8 +62,6 @@ object Issues {
   def getIssueById(id: Long, userClient: UserClient): Option[IssueDB] = {
     Await.result(db.run(issues.filter(_.id === id).result), Duration.Inf).headOption
   }
-
-
 
   def insertIssue(issue: IssueDB, userClient: UserClient): IssueDB = {
     Await.result(db.run(

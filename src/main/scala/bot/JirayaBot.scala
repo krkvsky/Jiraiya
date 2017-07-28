@@ -14,6 +14,8 @@ import jira.Issue._
 import Markup._
 import Actors._
 import Util._
+import org.joda.time.DateTime
+import org.joda.time.format.DateTimeFormat
 
 object JirayaBot extends TelegramBot with Polling with Commands with Callbacks with Authentication {
 
@@ -219,6 +221,20 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
       admin => {
         val issues = getIssuesByUsername(getUser(msg.source).firstName, admin)
         issues.foreach(x => reply(x.key + ":\n" + x.description))
+      }
+    } /* or else */ {
+      user =>
+        reply(s"${user.firstName}, you must /login first.")
+    }
+  }
+
+  onCommand("/logs") { implicit msg =>
+    authenticatedOrElse {
+      admin => {
+        val date = msg.text.getOrElse("").split(" ")
+        val worklogs = if(date.length > 1) getUserWorklogs(DateTimeFormat.forPattern("yyyy/MM/dd").parseDateTime(date(1)), admin) else
+          getUserYesterdayWorklogs(admin)
+        worklogs.foreach(x => reply(briefIssue(x._1)+ ":\n" + (x._2/3600) + "h " + (x._2/60)%60 + "m", parseMode = Some(ParseMode.Markdown)))
       }
     } /* or else */ {
       user =>
