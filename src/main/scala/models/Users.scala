@@ -39,11 +39,11 @@ object Users {
     unfiltered.filter(_.isDefined).map(j => getIssueById(j.get.issueId, userClient)).filter(j => j.isDefined).map(_.get)
   }
 
-  def updateUserIssuesActor(user: UserDB, userClient: UserClient): List[IssueDB] = {
+  def updateUserIssuesActor(user: UserDB, userClient: UserClient): List[(Boolean, IssueDB)] = {
     //    val userIssues = getIssuesByUser(user, userClient)
     val userIssues = getIssuesByUserJira(user, userClient)
-    val unfiltered = for(issue <- userIssues) yield getNewUserIssue(user.id.get, issue.id.get, userClient)
-    unfiltered.filter(_.isDefined).map(j => getIssueById(j.get.issueId, userClient)).filter(j => j.isDefined).map(_.get)
+    val unfiltered = for(issue <- userIssues) yield getChangedIssues(user.id.get, issue.id.get, userClient)
+    unfiltered.filter(_._2.isDefined).map(j => (j._1, getIssueById(j._2.get.issueId, userClient))).filter(j => j._2.isDefined).map(j => (j._1, j._2.get))
   }
 
   def userFirst(chatid: Long): Boolean = {

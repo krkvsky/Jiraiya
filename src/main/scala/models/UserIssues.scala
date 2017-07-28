@@ -32,6 +32,30 @@ object UserIssues {
       insertUserIssue(UserIssueDB(userId, issueId))
   }
 
+  def getChangedIssues(userId: Long, issueId: Long, userClient: UserClient): (Boolean, Option[UserIssueDB])= {
+    val userIssue = Await.result(db.run(userissues.filter(x => x.userId === userId && x.issueId === issueId).result), Duration.Inf)
+    if(userIssue.nonEmpty) {
+      val issue = getIssueById(issueId, userClient).get
+      val jiraIssue = getIssueFromJira(issue.key, userClient)
+      if(jiraIssue.updatedAt == issue.updatedAt) {
+        println("not new and updated")
+        (false, None)
+      }
+      else{
+        val iss = issues.filter(x => x.id === issueId)
+        val q = for { i <- iss } yield i.updatedAt
+        val action = q.update(jiraIssue.updatedAt)
+        Await.result(db.run(action), Duration.Inf)
+        println("updated " + issueId)
+        (false, Some(UserIssueDB(userId, issueId)))
+      }
+    }
+    else {
+      println("new " + issueId)
+      (true, Some(insertUserIssue(UserIssueDB(userId, issueId))))
+    }
+  }
+
 
   def getNewUserIssue(userId: Long, issueId: Long, userClient: UserClient): Option[UserIssueDB] = {
     val userIssue = Await.result(db.run(userissues.filter(x => x.userId === userId && x.issueId === issueId).result), Duration.Inf)
