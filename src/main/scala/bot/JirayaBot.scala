@@ -26,6 +26,10 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
   def token = "393149916:AAFf7YWkfwhUa2PlXRPXPk-anHmYvusFyco"
   val mySystem = ActorSystem("CheckerValidatorSystem")
 
+
+  val checker = mySystem.actorOf(Props(new Checker), name = "checker")
+
+
   onCallbackWithTag("PROJECTS_TAG") { implicit cbq =>
     val user = isAuthenticated(cbq.from).get
     // Notification only shown to the user who pressed the button.
@@ -36,7 +40,7 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
       val project = getProjectByKey(offs)
       println(project)
       println(cbq.data.get)
-      println(s"Project id: $project.id")
+      println(s"Project id: ${project.id}")
       val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
       println("final")
       request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues, cbq.data.get)))
@@ -169,9 +173,7 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
         val user: UserDB = if(userFirst(msg.source)){
           firstLaunch(msg.source, username, loginResult.get)
         } else getUser(msg.source, username)
-        val validator = mySystem.actorOf(Props(new Validator(request)), name = "validator")
-        val checker = mySystem.actorOf(Props(new Checker((msg.source, loginResult.get), validator)), name = "checker")
-        checker ! StartMessage
+        checker ! (msg.source, loginResult.get)
         reply("login successful")
       } else
         reply("login failed")
