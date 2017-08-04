@@ -21,7 +21,7 @@ object Util {
   def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key}) ${iss.name}"
 
   def issueIsActive(iss: IssueDB): Boolean = {
-    List("in progress", "open").contains(iss.status.toLowerCase)
+    List("in progress", "open", "reopened").contains(iss.status.toLowerCase)
   }
 
   def millisToMinutes(milliseconds: Long): Int = (milliseconds / 60000).toInt

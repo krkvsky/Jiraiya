@@ -223,12 +223,16 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
         case _ => ("", "")
       }
       if (username != "") {
-        val loginResult = login(msg.from.get, username, password, request, msg.source)
+        val loginResult = login(msg.from.get, username, password, request)
         reply("wait few minutes to synchronize your data")
-        if (loginResult.isDefined) {
+        if (loginResult._1.isDefined) {
+          println(loginResult)
+          println(userFirst(msg.source))
           val user: UserDB = if (userFirst(msg.source)) {
-            firstLaunch(msg.source, username, loginResult.get)
+            println("here with beautiful username" + username)
+            firstLaunch(msg.source, username, loginResult._1.get)
           } else getUser(msg.source, username)
+          loginResult._2 ! (msg.source, loginResult._1.get)
           reply("login successful")
         } else
           reply("login failed")

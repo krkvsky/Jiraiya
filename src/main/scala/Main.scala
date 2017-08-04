@@ -16,18 +16,35 @@ import scala.concurrent.Await
 import scala.util.{Failure, Success}
 import collection.JavaConverters._
 import scala.collection.JavaConverters
+import models.Issues._
+import models.Users._
+import models.Projects._
+import models.Issues._
+import models.IssueWorking._
+import models.UserIssues._
 
 object Main extends App{
+//  val db = Database.forConfig("db")
+//  def setup = DBIO.seq (
+//    (users.schema ++ projects.schema ++ issues.schema ++ issueworking.schema ++ userissues.schema).create
+//  )
 //  Await.result(db.run(setup), Duration.Inf)
 
   JirayaBot.run()
 //  val ur =  new URI("http://jira.tallium.com:8085")
-//
+
 //  val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
 //    ur, "YaroslavK", "last:partizan"
 //  )
-//  val temp = restClient.getSearchClient.searchJql("worklogAuthor = currentUser() AND worklogDate > '2017/7/26'").claim().getIssues.iterator().asScala.toList
-//  println(temp.head.getField("progress").getValue.toString.drop(12).take(5))
+//  var set = new java.util.HashSet[String]()
+//  set.add("*all")
+//
+//  val temp = restClient.getSearchClient.searchJql(s"assignee=yaroslavk AND (status = Open OR status = Reopened OR status = 'In Progress') order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList
+//    .map(x => x.getStatus)
+//  println(temp)
+//  println(temp.length)
+
+  //  println(temp.head.getField("progress").getValue.toString.drop(12).take(5))
 //
 //  val dt = new org.joda.time.DateTime()
 //  println("%s/%s/%s".format(dt.year().get(), dt.monthOfYear().getAsString, dt.dayOfMonth().get()))

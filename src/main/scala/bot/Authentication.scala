@@ -20,7 +20,7 @@ trait Authentication {
   val allowed: mutable.Set[(UserClient, ActorRef)] = scala.collection.mutable.Set[(UserClient, ActorRef)]()
   val URI =  new URI("http://jira.tallium.com:8085")
   def atomic[T](f: => T): T = allowed.synchronized { f }
-  def login(user: User, username: String, password: String, request: RequestHandler, source: Long): Option[UserClient] = atomic {
+  def login(user: User, username: String, password: String, request: RequestHandler): (Option[UserClient], ActorRef)= atomic {
     val restClient = new AsynchronousJiraRestClientFactory().createWithBasicHttpAuthentication(
       URI, username, password
     )
@@ -28,12 +28,12 @@ trait Authentication {
       // here check if in database, and if not, insert into db
       val valid = JirayaBot.mySystem.actorOf(Props(new Validator(request)), "validator"+user.id+org.joda.time.DateTime.now().getMillis)
       val uc = UserClient(user, restClient)
-      valid ! (source, uc)
+//      valid ! (source, uc)
       restClient.getSessionClient.getCurrentSession.claim()
       allowed += ((uc, valid))
-      Some(uc)
+      (Some(uc), valid)
     } catch {
-      case _: Exception => None
+      case _: Exception => (None, ActorRef.noSender)
     }
   }
 

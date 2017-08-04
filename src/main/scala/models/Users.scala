@@ -47,7 +47,7 @@ object Users {
   }
 
   def userFirst(chatid: Long): Boolean = {
-    return !Await.result(db.run(users.filter(_.chatid === chatid).result), Duration.Inf).nonEmpty
+    return Await.result(db.run(users.filter(_.chatid === chatid).result), Duration.Inf).isEmpty
   }
 
   def getUser(chatid: Long, name: String = ""): UserDB = {
@@ -66,6 +66,7 @@ object Users {
   }
 
   def firstLaunch(chatid: Long, name: String, userClient: UserClient): UserDB = {
+    println("at first launch bro")
     val user = getUser(chatid, name)
     updateUserIssues(user, userClient)
     user

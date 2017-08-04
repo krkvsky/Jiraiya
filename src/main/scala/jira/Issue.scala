@@ -72,7 +72,7 @@ object Issue {
     var set = new java.util.HashSet[String]()
     set.add("*all")
 
-    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} order by created", Int.MaxValue, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} AND status in ('Open','Reopened', 'In progress') order by created", Int.MaxValue, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
   def getIssuesByUserJiraFirst(user: UserDB, userClient: UserClient, filters: String = ""): List[IssueDB] = {
@@ -81,14 +81,14 @@ object Issue {
     var set = new java.util.HashSet[String]()
     set.add("*all")
 
-    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+    userClient.rest.getSearchClient.searchJql(s"assignee=${user.firstName} AND (status = Open OR status = Reopened OR status = 'In Progress') order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
   def getIssuesByUsername(username: String, userClient: UserClient, filters: String = ""): List[IssueDB] = {
     var set = new java.util.HashSet[String]()
     set.add("*all")
 
-    userClient.rest.getSearchClient.searchJql(s"assignee=$username order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
+    userClient.rest.getSearchClient.searchJql(s"assignee=$username AND (status = Open OR status = Reopened OR status = 'In Progress') order by created", 100, 0, set).claim().getIssues.iterator().asScala.toList.map(x => getIssue(x.getKey, userClient))
   }
 
   def getUserWorklogs(date: org.joda.time.DateTime, userClient: UserClient): Map[IssueDB, Long] = {
