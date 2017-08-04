@@ -9,7 +9,10 @@ object Markup {
   def projectTag = prefixTag("PROJECTS_TAG") _
   def issueTag = prefixTag("ISSUES_TAG") _
   def interactiveTag = prefixTag("INTERACTIVE_TAG") _
+  def interactiveSwitchTag = prefixTag("INTERACTIVE_SWITCH_TAG") _
 
+  def statusesTag = prefixTag("STATUSES_TAG") _
+  def statusIssueTag = prefixTag("STATUS_ISSUE_TAG") _
   def statusFinish = prefixTag("FINISH_STATUS_TAG") _
   def statusPause = prefixTag("PAUSE_STATUS_TAG") _
   def statusResume = prefixTag("RESUME_STATUS_TAG") _
@@ -51,13 +54,29 @@ object Markup {
     )
   }
 
-  def markupInteractive(issue: IssueDB) = {
+  def markupStatusIssues(issues: List[IssueWorkingDB], issueNames: Map[Option[Long], String]) = {
     InlineKeyboardMarkup(
-      InlineKeyboardButton.callbackData(
-        "Start work",
-        interactiveTag(issue.key)
-      ).toSeq
+      issues.map(x => InlineKeyboardButton.callbackData(
+        s"${issueNames(Some(x.issueId))}",
+        statusIssueTag(x.issueId.toString))
+      )
     )
   }
 
+
+  def markupInteractive(issue: IssueDB, switch: Boolean) = {
+    InlineKeyboardMarkup(
+      if(!switch) {
+        InlineKeyboardButton.callbackData(
+          "Start work",
+          interactiveTag(issue.key)
+        ).toSeq
+      } else {
+        InlineKeyboardButton.callbackData(
+          "Switch",
+          interactiveSwitchTag(issue.key)
+        ).toSeq
+      }
+    )
+  }
 }

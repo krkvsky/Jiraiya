@@ -26,7 +26,7 @@ trait Authentication {
     )
     try {
       // here check if in database, and if not, insert into db
-      val valid = JirayaBot.mySystem.actorOf(Props(new Validator(request)), "validator"+user.id+org.joda.time.DateTime.now())
+      val valid = JirayaBot.mySystem.actorOf(Props(new Validator(request)), "validator"+user.id+org.joda.time.DateTime.now().getMillis)
       val uc = UserClient(user, restClient)
       valid ! (source, uc)
       restClient.getSessionClient.getCurrentSession.claim()

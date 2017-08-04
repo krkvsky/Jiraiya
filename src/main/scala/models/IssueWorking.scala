@@ -37,12 +37,21 @@ object IssueWorking {
   val issueworking= TableQuery[IssueWorking]
   val db = Database.forConfig("db")
 
+  def getIssueWorkingOnById(id: Long, user: UserDB, userClient: UserClient): Option[IssueWorkingDB] = {
+    Await.result(db.run(issueworking.filter(_.issueId === id).result), Duration.Inf).headOption
+  }
+
+
   def getIssueWorkingOn(user: UserDB, userClient: UserClient): Option[IssueWorkingDB] = {
     Await.result(db.run(issueworking.filter(x => x.userId === user.id && !x.paused && !x.finished).result), Duration.Inf).headOption
   }
 
   def getIssueWorkingOnPaused(user: UserDB, userClient: UserClient): Option[IssueWorkingDB] = {
     Await.result(db.run(issueworking.filter(x => x.userId === user.id && x.paused && !x.finished).result), Duration.Inf).headOption
+  }
+
+  def getIssuesWorkingOn(user: UserDB, userClient: UserClient): List[IssueWorkingDB] = {
+    Await.result(db.run(issueworking.filter(x => x.userId === user.id && !x.finished).result), Duration.Inf).toList
   }
 
 
@@ -64,10 +73,6 @@ object IssueWorking {
       println("Start pause")
       val workToLog = System.currentTimeMillis() - previous
       addWorklog(curr, previous, workToLog, userClient)
-//      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
-//      val worklogURI = issue.getWorklogUri
-//      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
-//      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
       println("end pause")
       val newTime = curr.time + workToLog
       Await.result(
@@ -86,6 +91,16 @@ object IssueWorking {
     )
   }
 
+  def switchIssueWorkingOn(issue: IssueDB, user: UserDB, userClient: UserClient) = {
+    val issues = getIssuesWorkingOn(user, userClient)
+    val thisIssue = issues.find(_.issueId == issue.id.get)
+    pauseIssueWorkingOn(user, userClient)
+    if(thisIssue.isDefined)
+      resumeIssueWorkingOn(thisIssue.get, user, userClient)
+    else
+      startIssueWorkingOn(issue, user, userClient)
+  }
+
   def finishIssueWorkingOn(user: UserDB, userClient: UserClient): Long = {
     val currentGo = getIssueWorkingOn(user, userClient)
     val currentPaused = getIssueWorkingOnPaused(user, userClient)
@@ -96,10 +111,6 @@ object IssueWorking {
       val previous = if(curr.continuedAt != 0) curr.continuedAt else curr.startedAt
       val workToLog = System.currentTimeMillis() - previous
       val key = addWorklog(curr, previous, workToLog, userClient)
-//      val issue = getOriginalIssueFromJira(getIssueById(curr.issueId, userClient).get.key, userClient)
-//      val worklogURI = issue.getWorklogUri
-//      val worklog = WorklogInput.create(issue.getSelf, null, new DateTime(previous), Util.millisToMinutes(workToLog), null)
-//      userClient.rest.getIssueClient.addWorklog(worklogURI, worklog)
       val newTime = curr.time + workToLog
       Await.result(
         db.run(

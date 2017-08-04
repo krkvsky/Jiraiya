@@ -42,9 +42,8 @@ object UserIssues {
         (false, None)
       }
       else{
-        val iss = issues.filter(x => x.id === issueId)
-        val q = for { i <- iss } yield i
-        val action = q.update(jiraIssue)
+        val action = issues.filter(x => x.id === issueId).update(jiraIssue)
+//        val action = q.update(jiraIssue)
         Await.result(db.run(action), Duration.Inf)
         println("updated " + issueId)
         (false, Some(UserIssueDB(userId, issueId)))

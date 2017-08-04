@@ -58,12 +58,15 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     // Notification only shown to the user who pressed the button.
     ackCallback(cbq.from.firstName + " pressed the button!")
     // Or just ackCallback()
-    val query = cbq.data.get
     val issue = getIssue(cbq.data.get, user)
-    if (getIssueWorkingOn(getUser(cbq.message.get.source), user).isDefined)
+    val workingIss = getIssueWorkingOn(getUser(cbq.message.get.source), user)
+    val issues = getIssuesWorkingOn(getUser(cbq.message.get.source), user)
+    val isCurrent = workingIss.isDefined && workingIss.get.issueId == issue.id.get
+    val switch = issues.count(_.issueId == issue.id) == 0
+    if (isCurrent)
       request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown)))
     else
-      request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown), replyMarkup = markupInteractive(issue)))
+      request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown), replyMarkup = markupInteractive(issue, switch)))
   }
 
   onCallbackWithTag("INTERACTIVE_TAG") { implicit cbq =>
@@ -75,6 +78,45 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     val issue = getIssue(cbq.data.get, userClient)
     startIssueWorkingOn(issue, user, userClient)
     request(SendMessage(cbq.message.get.source, s"Work on ${issue.key} was started!"))
+  }
+
+  onCallbackWithTag("INTERACTIVE_SWITCH_TAG") { implicit cbq =>
+    val userClient = isAuthenticated(cbq.from).get
+    val user = getUser(cbq.message.get.source)
+    // Notification only shown to the user who pressed the button.
+    ackCallback(cbq.from.firstName + " pressed the button!")
+    // Or just ackCallback()
+    val issue = getIssue(cbq.data.get, userClient)
+    switchIssueWorkingOn(issue, user, userClient)
+    request(SendMessage(cbq.message.get.source, s"Work on ${issue.key} was started!"))
+  }
+
+  onCallbackWithTag("STATUSES_TAG") { implicit cbq =>
+    val user = isAuthenticated(cbq.from).get
+    val issues = getIssuesWorkingOn(getUser(cbq.message.get.source), user)
+    val issueNames = issues.map(x => getIssueById(x.issueId, user).get).map(x => x.id -> (x.key+":"+x.name)).toMap
+    request(SendMessage(cbq.message.get.source, "Working on:", replyMarkup = markupStatusIssues(issues, issueNames)))
+  }
+
+  onCallbackWithTag("STATUS_ISSUE_TAG") { implicit cbq =>
+    val user = isAuthenticated(cbq.from).get
+    // Notification only shown to the user who pressed the button.
+    ackCallback(cbq.from.firstName + " pressed the button!")
+    // Or just ackCallback()
+    val query = cbq.data.get
+    val current = getIssueWorkingOnById(query.toInt, getUser(cbq.message.get.source), user)
+    if (current.isDefined) {
+      val curr = current.get
+      if(curr.paused){
+        val issue = getIssueById(curr.issueId, user).get
+        request(SendMessage(cbq.message.get.source, s"You were working on ${issue.key} for ${millisFormat(curr.time)}", replyMarkup = markupStatus(curr)))
+      } else {
+        val previous = if (curr.continuedAt != 0) curr.continuedAt else curr.startedAt
+        val newTime = Util.millisFormat(curr.time + (System.currentTimeMillis() - previous))
+        val issue = getIssueById(curr.issueId, user).get
+        request(SendMessage(cbq.message.get.source, s"You are working on ${issue.key} for $newTime", replyMarkup = markupStatus(curr)))
+      }
+    }
   }
 
   onCallbackWithTag("FINISH_STATUS_TAG") { implicit cbq =>
@@ -133,20 +175,36 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
   onCommand("/status") { implicit msg =>
     authenticatedOrElse {
       admin => {
+        val issues = getIssuesWorkingOn(getUser(msg.source), admin)
         val current = getIssueWorkingOn(getUser(msg.source), admin)
-        val currentPaused = getIssueWorkingOnPaused(getUser(msg.source), admin)
-        if(current.isDefined) {
+        println("1")
+        if(issues.isEmpty){
+          println("2")
+          reply("You are not working now")
+        } else if(issues.length == 1) {
+          println("3")
+          if (current.isDefined) {
+            val curr = current.get
+            val previous = if (curr.continuedAt != 0) curr.continuedAt else curr.startedAt
+            val newTime = Util.millisFormat(curr.time + (System.currentTimeMillis() - previous))
+            val issue = getIssueById(curr.issueId, admin).get
+            reply(s"You are working on ${issue.key} for $newTime", replyMarkup = markupStatus(curr))
+          } else {
+            val curr = getIssueWorkingOnPaused(getUser(msg.source), admin).get
+            val issue = getIssueById(curr.issueId, admin).get
+            reply(s"You were working on ${issue.key} for ${millisFormat(curr.time)}", replyMarkup = markupStatus(curr))
+          }
+        } else if(issues.length > 1 && current.isDefined){
           val curr = current.get
-          val previous = if(curr.continuedAt != 0) curr.continuedAt else curr.startedAt
+          val previous = if (curr.continuedAt != 0) curr.continuedAt else curr.startedAt
           val newTime = Util.millisFormat(curr.time + (System.currentTimeMillis() - previous))
           val issue = getIssueById(curr.issueId, admin).get
-          reply(s"You are working on ${issue.key} for $newTime", replyMarkup = markupStatus(curr))
-        } else if(currentPaused.isDefined){
-          val curr = currentPaused.get
-          val issue = getIssueById(curr.issueId, admin).get
-          reply(s"You were working on ${issue.key} for ${millisFormat(curr.time)}", replyMarkup = markupStatus(curr))
-        } else
-          reply("You are not working now!")
+          val issueNames = issues.map(x => getIssueById(x.issueId, admin).get).map(x => x.id -> (x.key+":"+x.name)).toMap
+          reply(s"You are working on ${issue.key} for $newTime", replyMarkup = markupStatusIssues(issues, issueNames))
+        }else if(issues.length > 1 && current.isEmpty){
+          val issueNames = issues.map(x => getIssueById(x.issueId, admin).get).map(x => x.id -> (x.key+":"+x.name)).toMap
+          reply(s"You are working on ${issues.length} issues: ", replyMarkup = markupStatusIssues(issues, issueNames))
+        }
       }
     } /* or else */ {
       user =>
