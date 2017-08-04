@@ -20,9 +20,10 @@ object Util {
     s" ${iss.description.getOrElse("None description provided :(")}"
   def briefIssue(iss: IssueDB): String = s"[${iss.key}](http://jira.tallium.com:8085/browse/${iss.key}) ${iss.name}"
 
-  def issueIsResolved(iss: IssueDB): Boolean = {
-    List("In Review", "Resolved", "Closed", "Done").contains(iss.status)
+  def issueIsActive(iss: IssueDB): Boolean = {
+    List("in progress", "open").contains(iss.status.toLowerCase)
   }
 
-  def millisToMinutes(milliseconds: Long): Int = ((milliseconds / 60000) % 60).toInt
+  def millisToMinutes(milliseconds: Long): Int = (milliseconds / 60000).toInt
+  def millisFormat(milliseconds: Long): String = s"${millisToMinutes(milliseconds) / 60}h ${millisToMinutes(milliseconds) % 60}m"
 }

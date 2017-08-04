@@ -56,8 +56,18 @@ object Issues {
   def getIssuesByUser(user: UserDB, userClient: UserClient): List[IssueDB] = {
     Await.result(db.run(userissues.filter(_.userId === user.id).result), Duration.Inf).map(x => getIssueById(x.issueId, userClient))
       .filter(x => x.isDefined)
-      .map(x => x.get).filterNot(x => issueIsResolved(x)).toList
+      .map(x => x.get).filter(x => issueIsActive(x)).toList
   }
+
+  def getIssuesDBByProject(projectID: Long, user: UserDB, userClient: UserClient): List[IssueDB] = {
+    Await.result(db.run(userissues.filter(x => x.userId === user.id).result), Duration.Inf).map(x => getIssueById(x.issueId, userClient))
+      .filter(x => x.isDefined)
+      .map(x => x.get)
+      .filter(x => x.projectID == projectID)
+      .filter(x => issueIsActive(x)).toList
+
+  }
+
 
   def getIssueById(id: Long, userClient: UserClient): Option[IssueDB] = {
     Await.result(db.run(issues.filter(_.id === id).result), Duration.Inf).headOption

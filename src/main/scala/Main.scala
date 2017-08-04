@@ -19,6 +19,7 @@ import scala.collection.JavaConverters
 
 object Main extends App{
 //  Await.result(db.run(setup), Duration.Inf)
+
   JirayaBot.run()
 //  val ur =  new URI("http://jira.tallium.com:8085")
 //

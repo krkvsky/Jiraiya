@@ -41,13 +41,15 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
       println(project)
       println(cbq.data.get)
       println(s"Project id: ${project.id}")
-      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+      val issues  = getIssuesDBByProject(project.id.get, getUser(cbq.message.get.source), user)
+//      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
       println("final")
       request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues, cbq.data.get)))
     } else {
       val offset = offs.drop(1).toInt
       val project = getProjectByKey(key)
-      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+//      val issues = getIssuesByUser(getUser(cbq.message.get.source), user).filter(x => x.projectID == project.id.get)
+      val issues = getIssuesDBByProject(project.id.get, getUser(cbq.message.get.source), user)
       if(issues.slice(offset, offset+5).nonEmpty)
         request(EditMessageReplyMarkup(cbq.message.get.source, cbq.message.get.messageId, replyMarkup = markupIssues(issues, key, offset)))
 //      request(SendMessage(cbq.message.get.source, "Issues: ", replyMarkup = markupIssues(issues, key, offs.drop(1).toInt)))
@@ -86,23 +88,19 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     // Or just ackCallback()
     val issueWork = if(getIssueWorkingOn(user, userClient).isDefined) getIssueWorkingOn(user, userClient) else getIssueWorkingOnPaused(user, userClient)
     val issue = getIssueById(issueWork.get.issueId, userClient).get
-    val time = Util.millisToMinutes(finishIssueWorkingOn(user, userClient))
-    request(SendMessage(cbq.message.get.source, s"Work on ${issue.key} was finished! You've spent $time minutes on it!"))
+    val time = Util.millisFormat(finishIssueWorkingOn(user, userClient))
+    request(SendMessage(cbq.message.get.source, s"Work on ${issue.key} was finished! You've spent ${time}!"))
   }
 
   onCallbackWithTag("PAUSE_STATUS_TAG") { implicit cbq =>
-    println("here pause")
     val userClient = isAuthenticated(cbq.from).get
     val user = getUser(cbq.message.get.source)
-    println("here pause 2")
     // Notification only shown to the user who pressed the button.
     ackCallback(cbq.from.firstName + " pressed the button!")
     // Or just ackCallback()
     val issueWork = getIssueWorkingOn(user, userClient)
     val issue = getIssueById(issueWork.get.issueId, userClient).get
-    println("here pause3")
     pauseIssueWorkingOn(user, userClient)
-    println("here pause4")
     request(SendMessage(cbq.message.get.source, s"Work on ${issue.key} was paused!"))
   }
 
@@ -143,14 +141,13 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
         if(current.isDefined) {
           val curr = current.get
           val previous = if(curr.continuedAt != 0) curr.continuedAt else curr.startedAt
-          val newTime = Util.millisToMinutes(curr.time + (System.currentTimeMillis() - previous))
+          val newTime = Util.millisFormat(curr.time + (System.currentTimeMillis() - previous))
           val issue = getIssueById(curr.issueId, admin).get
-          reply(s"You are working on ${issue.key} for $newTime minutes", replyMarkup = markupStatus(curr))
+          reply(s"You are working on ${issue.key} for $newTime", replyMarkup = markupStatus(curr))
         } else if(currentPaused.isDefined){
           val curr = currentPaused.get
-          val newTime = Util.millisToMinutes(curr.time)
           val issue = getIssueById(curr.issueId, admin).get
-          reply(s"You were working on ${issue.key} for $newTime minutes.", replyMarkup = markupStatus(curr))
+          reply(s"You were working on ${issue.key} for ${millisFormat(curr.time)}", replyMarkup = markupStatus(curr))
         } else
           reply("You are not working now!")
       }
@@ -162,30 +159,35 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
 
 
   onCommand("/login") { implicit msg =>
-    val (username: String, password: String) = msg.text.getOrElse("").split(" ") match {
-      case Array(_, y, z) => (y, z)
-      case _ => ("", "")
+    authenticatedOrElse { admin => {
+      reply(s"You are authorized as ${admin.user.firstName}")
     }
-    if(username != ""){
-      val loginResult = login(msg.from.get, username, password)
-      reply("wait few minutes to synchronize your data")
-      if(loginResult.isDefined){
-        val user: UserDB = if(userFirst(msg.source)){
-          firstLaunch(msg.source, username, loginResult.get)
-        } else getUser(msg.source, username)
-        checker ! (msg.source, loginResult.get)
-        reply("login successful")
-      } else
-        reply("login failed")
-    } else {
-      reply("Correct format is '/login username password'")
-    }
+    }{ user =>
+      val (username: String, password: String) = msg.text.getOrElse("").split(" ") match {
+        case Array(_, y, z) => (y, z)
+        case _ => ("", "")
+      }
+      if (username != "") {
+        val loginResult = login(msg.from.get, username, password)
+        reply("wait few minutes to synchronize your data")
+        if (loginResult.isDefined) {
+          val user: UserDB = if (userFirst(msg.source)) {
+            firstLaunch(msg.source, username, loginResult.get)
+          } else getUser(msg.source, username)
+          checker ! (msg.source, loginResult.get)
+          reply("login successful")
+        } else
+          reply("login failed")
+      } else {
+        reply("Correct format is '/login username password'")
+      }
 
+    }
   }
 
   onCommand("/logout") { implicit msg =>
     msg.from.foreach(logout)
-    reply("You cannot access /secret anymore. Bye bye!" )
+    reply("Bye bye!" )
   }
 
   onCommand("/project") { implicit msg =>
