@@ -27,9 +27,6 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
   val mySystem = ActorSystem("CheckerValidatorSystem")
 
 
-  val checker = mySystem.actorOf(Props(new Checker), name = "checker")
-
-
   onCallbackWithTag("PROJECTS_TAG") { implicit cbq =>
     val user = isAuthenticated(cbq.from).get
     // Notification only shown to the user who pressed the button.
@@ -168,13 +165,12 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
         case _ => ("", "")
       }
       if (username != "") {
-        val loginResult = login(msg.from.get, username, password)
+        val loginResult = login(msg.from.get, username, password, request, msg.source)
         reply("wait few minutes to synchronize your data")
         if (loginResult.isDefined) {
           val user: UserDB = if (userFirst(msg.source)) {
             firstLaunch(msg.source, username, loginResult.get)
           } else getUser(msg.source, username)
-          checker ! (msg.source, loginResult.get)
           reply("login successful")
         } else
           reply("login failed")
