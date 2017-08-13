@@ -42,7 +42,10 @@ object UserIssues {
         (false, None)
       }
       else{
-        val action = issues.filter(x => x.id === issueId).update(jiraIssue)
+        val action = issues
+          .filter(x => x.id === issueId)
+          .map(x => (x.name, x.description, x.status, x.updatedAt))
+          .update((jiraIssue.name, jiraIssue.description, jiraIssue.status, jiraIssue.updatedAt))
 //        val action = q.update(jiraIssue)
         Await.result(db.run(action), Duration.Inf)
         println("updated " + issueId)

@@ -51,8 +51,10 @@ trait Authentication {
         val userClient = isAuthenticated(user)
         if (userClient.isDefined)
           ok(userClient.get)
-        else
+        else {
+          logout(user)
           noAccess(user)
+        }
     }
   }
 

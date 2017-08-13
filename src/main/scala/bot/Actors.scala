@@ -6,12 +6,14 @@ import info.mukel.telegrambot4s.Implicits._
 import info.mukel.telegrambot4s.api._
 import info.mukel.telegrambot4s.methods.{ParseMode, SendMessage}
 import models.Users._
+import bot.Authentication
 
 object Actors {
 
   class Validator(req: RequestHandler) extends Actor {
     def receive = {
       case tup: (Long, UserClient) => {
+
         val chatID = tup._1
         val l = updateUserIssuesActor(getUser(chatID), tup._2)
         if(l.nonEmpty){
@@ -30,7 +32,9 @@ object Actors {
             }
           }
         }
-        Thread.sleep(120000)}
+        Thread.sleep(120000)
+        self ! tup
+      }
     }
   }
 
