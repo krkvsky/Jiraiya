@@ -66,7 +66,7 @@ object Markup {
 
   def markupInteractive(issue: IssueDB, switch: Boolean) = {
     InlineKeyboardMarkup(
-      if(!switch) {
+      if(switch) {
         InlineKeyboardButton.callbackData(
           "Start work",
           interactiveTag(issue.key)

@@ -62,11 +62,10 @@ object JirayaBot extends TelegramBot with Polling with Commands with Callbacks w
     val workingIss = getIssueWorkingOn(getUser(cbq.message.get.source), user)
     val issues = getIssuesWorkingOn(getUser(cbq.message.get.source), user)
     val isCurrent = workingIss.isDefined && workingIss.get.issueId == issue.id.get
-    val switch = issues.count(_.issueId == issue.id) == 0
     if (isCurrent)
       request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown)))
     else
-      request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown), replyMarkup = markupInteractive(issue, switch)))
+      request(SendMessage(cbq.message.get.source, showIssue(issue), parseMode = Some(ParseMode.Markdown), replyMarkup = markupInteractive(issue, workingIss.isEmpty)))
   }
 
   onCallbackWithTag("INTERACTIVE_TAG") { implicit cbq =>
